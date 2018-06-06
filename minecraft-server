@@ -1,0 +1,152 @@
+#!/bin/sh
+# 10-06-2015
+# billy
+# minecraft-server.sh
+
+USUARI="minecraft"
+RAM="2G"
+APLIC_RUTA="/opt/minecraft/app"
+SERVER_RUTA="/opt/minecraft/server"
+REGION_RUTA="/opt/minecraft/server/world/region"
+LOG_RUTA="/var/log/minecraft"
+FIFO_NOM="console.in"
+ANY=$(date +%Y)
+MES=$(date +%m)
+DIA=$(date +%d)
+AVUI=$(echo "$ANY-$MES-$DIA")
+LOG_NOM=$(echo $AVUI.log)
+
+logs() {
+    cd $LOG_RUTA
+    for i in *.log ; do
+	DATA=$(basename $i .log)
+	if [ $DATA != $AVUI ] ; then
+	    gzip "$DATA.log"
+	fi
+    done
+}
+
+iniciar() {
+    logs
+    cd $SERVER_RUTA
+    rm $FIFO_NOM 2> /dev/null
+    executar "mkfifo $FIFO_NOM" $USUARI
+    chmod g+w $FIFO_NOM
+    executar "tail -f \"$FIFO_NOM\" | java -jar -Xms$RAM -Xmx$RAM minecraft_server.jar --nogui >> \"$LOG_RUTA/$LOG_NOM\"  &" $USUARI
+    ps ax | grep "tail -f $FIFO_NOM" | head -n1 | awk '{print $1}' > /var/run/mine_tail.pid
+    ps ax | grep "java -jar -Xms$RAM -Xmx$RAM minecraft_server.jar --nogui" | head -n1 | awk '{print $1}' > /var/run/mine.pid
+}
+
+apagar() {
+    cd $SERVER_RUTA
+    executar "echo \"stop\" > $FIFO_NOM" $USUARI
+    sleep 7
+
+    rm logs/* > /dev/null
+    rm $FIFO_NOM > /dev/null
+    kill -9 $(cat /var/run/mine_tail.pid)
+    rm /var/run/mine_tail.pid > /dev/null
+    rm /var/run/mine.pid > /dev/null
+}
+
+mal_apagat() {
+    ESTAT=$(estat)
+    if [ $ESTAT -ne 0 ] ; then
+	cd $SERVER_RUTA
+	JAVA_ON=$(ps -A | grep "$(cat /var/run/mine.pid)" | wc -l)
+	if [ $JAVA_ON -eq 0 ] ; then
+	    rm $FIFO_NOM > /dev/null
+	    kill -9 $(cat /var/run/mine_tail.pid)
+	    rm /var/run/mine_tail.pid > /dev/null
+	    rm /var/run/mine.pid > /dev/null  
+	fi
+    fi
+    }
+
+estat() {
+    cd $SERVER_RUTA
+    if [ -e $FIFO_NOM ] ; then
+	echo 1
+    else
+	echo 0
+    fi
+}
+
+copia_seg() {
+    cd "$SERVER_RUTA/.."
+    ANY=$(date +%Y)
+    MES=$(date +%m)
+    DIA=$(date +%d)
+    HORA=$(date +%H)
+    MINUT=$(date +%M)
+    executar "tar -czf \"/doc/dat/minecraft/server_$ANY-$MES-$DIA--$HORA-$MINUT.tar.gz\" server/*" $USUARI
+}
+
+guardar() {
+    cd $SERVER_RUTA
+    executar "echo \"save-all\" > $FIFO_NOM" $USUARI
+    sleep 7
+}
+
+executar() {
+    su -s /bin/sh -c "$1" $USUARI
+}
+
+if [ $(id -u) -ne 0 ] ; then  
+    echo "Has de ser root" >&2
+    exit 4
+fi
+
+. /lib/lsb/init-functions
+
+ESTAT=$(estat)
+mal_apagat
+
+case "$1" in
+    start)
+	if [ $ESTAT -ne 0 ] ; then
+	    log_warning_msg "El servidor ja esta engegat" || true
+	    exit 2
+	fi
+
+	iniciar
+	log_success_msg "Servidor minecraft engegat" || true
+	;;
+    
+    stop)
+	if [ $ESTAT -ne 1 ] ; then
+	    log_warning_msg "El servidor no esta engegat" || true
+	    exit 3
+	fi
+
+	guardar
+	log_success_msg "Partida minecraft guardada" || true
+
+	apagar
+	log_success_msg "Servidor minecraft apagat" || true
+	
+	;;
+    
+    restart)
+	if [ $ESTAT -ne 0 ] ; then
+	    apagar
+	fi
+	iniciar
+	log_success_msg "Servidor minecraft engegat" || true
+    ;;
+
+    status)
+	if [ $ESTAT -eq 0 ] ; then
+	   log_success_msg "Minecraft apagat" || true
+	else
+	   log_success_msg "Minecraft ences" || true
+	fi
+    ;;    
+
+    *)
+	log_action_msg "Utilitzar: /etc/init.d/minecraft-server {start|stop|restart|status}" || true
+	exit 1
+    ;;
+esac
+
+exit 0
