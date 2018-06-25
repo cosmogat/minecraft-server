@@ -37,11 +37,27 @@ systemctl {start|stop|restart|status} minecraft-server.service
 ```
 ## How does it work?
 Do you want to do your own minecraft init daemon? I explain you how this script works:
-1. Item 1
-1. Item 2
-1. Item 3
-1. Item 1
-1. Item 5
+1. The script create a FIFO file:
+```
+mkfifo console.in
+```
+1. Execute minecraft server like this:
+```
+tail -f console.in | java -jar minecraft_server.jar
+```
+1. Save the PIDs (process ID) of the last point (tail and java)
+1. If we write anything in console.in like this:
+```
+echo "weather rain" > console.in
+```
+will be like if we write on minecraft server shell.
+1. Finally the server is stopped with some like this:
+```
+echo "stop" > console.in
+sleep 5
+rm console.in
+kill -9 (the pid value of tail)
+```
 ## Autors
 * **Cosmo Cat**  [cosmogat](https://github.com/cosmogat)
 ## License
