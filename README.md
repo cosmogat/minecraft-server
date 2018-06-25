@@ -35,6 +35,13 @@ or
 ```
 systemctl {start|stop|restart|status} minecraft-server.service
 ```
+## How does it work?
+Do you want to do your own minecraft init daemon? I explain you how this script works:
+1. Item 1
+1. Item 2
+1. Item 3
+1. Item 1
+1. Item 5
 ## Autors
 * **Cosmo Cat**  [cosmogat](https://github.com/cosmogat)
 ## License
