@@ -1,10 +1,10 @@
 #!/bin/sh
 # 10-06-2015
-# billy
+# cosmogat
 # minecraft-server.sh
 
 USUARI="minecraft"
-RAM="2G"
+RAM="10G"
 APLIC_RUTA="/opt/minecraft/app"
 SERVER_RUTA="/opt/minecraft/server"
 REGION_RUTA="/opt/minecraft/server/world/region"
